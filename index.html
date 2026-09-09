@@ -1,0 +1,958 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monopoli Matematika SMP Interaktif</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        p1: '#ef4444',
+                        p1dark: '#dc2626',
+                        p2: '#3b82f6',
+                        p2dark: '#2563eb',
+                        board: '#0f172a',
+                    },
+                    fontFamily: {
+                        fredoka: ['Fredoka', 'sans-serif'],
+                        sans: ['Plus Jakarta Sans', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            min-height: 100vh;
+            color: #f8fafc;
+        }
+
+        .font-game {
+            font-family: 'Fredoka', cursive;
+        }
+
+        /* Responsive Monopoly Board Grid Layout (5x5 Perimeter = 16 Cells) */
+        .monopoly-board {
+            display: grid;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            grid-template-rows: repeat(5, minmax(0, 1fr));
+            gap: 6px;
+            aspect-ratio: 1 / 1;
+            width: 100%;
+            max-width: 620px;
+            background-color: #334155;
+            padding: 8px;
+            border-radius: 16px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5);
+            position: relative;
+        }
+
+        .board-cell {
+            background-color: #ffffff;
+            color: #1e293b;
+            border-radius: 10px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+            padding: 4px;
+            font-size: 0.7rem;
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.2s, box-shadow 0.2s;
+            user-select: none;
+        }
+
+        .board-cell.active-highlight {
+            ring: 4px solid #f59e0b;
+            transform: scale(1.03);
+            z-index: 10;
+        }
+
+        .cell-header {
+            width: 100%;
+            text-align: center;
+            font-weight: 700;
+            padding: 2px 0;
+            border-radius: 6px 6px 0 0;
+            font-size: 0.65rem;
+            text-transform: uppercase;
+        }
+
+        /* Dice 3D Effect */
+        .dice-box {
+            width: 60px;
+            height: 60px;
+            background: white;
+            border-radius: 14px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.8rem;
+            color: #1e293b;
+            box-shadow: 0 6px 0 #cbd5e1, 0 10px 15px rgba(0,0,0,0.3);
+            transition: transform 0.1s;
+        }
+
+        .dice-rolling {
+            animation: roll 0.4s infinite linear;
+        }
+
+        @keyframes roll {
+            0% { transform: rotate(0deg) scale(0.9); }
+            50% { transform: rotate(180deg) scale(1.1); }
+            100% { transform: rotate(360deg) scale(0.9); }
+        }
+
+        /* Player Tokens */
+        .token {
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            border: 2px solid white;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            color: white;
+            font-weight: bold;
+            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .token-p1 { background: linear-gradient(135deg, #ef4444, #991b1b); }
+        .token-p2 { background: linear-gradient(135deg, #3b82f6, #1e40af); }
+
+        /* Scratchpad Canvas */
+        #scratch-canvas {
+            touch-action: none;
+            cursor: crosshair;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1e293b;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body class="p-3 md:p-6 flex flex-col items-center">
+
+    <!-- App Header -->
+    <header class="w-full max-w-5xl flex flex-col md:flex-row justify-between items-center mb-4 gap-3">
+        <div class="flex items-center gap-3">
+            <div class="bg-indigo-600 p-3 rounded-2xl shadow-lg shadow-indigo-500/30 text-white text-2xl font-bold font-game">
+                <i class="fa-solid fa-calculator"></i>
+            </div>
+            <div>
+                <h1 class="text-2xl md:text-3xl font-bold font-game tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-rose-400 to-indigo-400">
+                    MONOPOLI MATEMATIKA SMP
+                </h1>
+                <p class="text-xs text-slate-400">Belajar Aritmetika Sosial, Aljabar, & Bilangan dengan Seru!</p>
+            </div>
+        </div>
+
+        <!-- Quick Controls -->
+        <div class="flex items-center gap-2">
+            <button onclick="toggleScratchpad()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-amber-400 text-xs font-semibold rounded-xl border border-slate-700 transition flex items-center gap-2">
+                <i class="fa-solid fa-pen-to-square"></i> Papan Coret-coret
+            </button>
+            <button onclick="toggleSound()" id="sound-btn" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl border border-slate-700 transition flex items-center gap-2">
+                <i class="fa-solid fa-volume-high"></i> <span id="sound-status">Suara: ON</span>
+            </button>
+            <button onclick="resetGamePrompt()" class="px-3 py-2 bg-rose-900/40 hover:bg-rose-900/70 text-rose-300 text-xs font-semibold rounded-xl border border-rose-700/50 transition">
+                <i class="fa-solid fa-rotate-left"></i> Reset
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Game Container -->
+    <main class="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        
+        <!-- Left Column: The Board (Cols 7) -->
+        <div class="lg:col-span-7 flex flex-col items-center">
+            
+            <!-- Monopoly Board 5x5 Grid (16 Tiles) -->
+            <div class="monopoly-board shadow-2xl" id="board-grid">
+                
+                <!-- Center Play Area Overlay (Grid position 2,2 to 4,4) -->
+                <div class="col-start-2 col-end-5 row-start-2 row-end-5 bg-slate-900/95 rounded-xl p-4 flex flex-col justify-between items-center border border-slate-700/80 text-center relative overflow-hidden">
+                    <div class="absolute inset-0 bg-gradient-to-br from-indigo-500/5 to-rose-500/5 pointer-events-none"></div>
+
+                    <!-- Turn Indicator -->
+                    <div id="turn-badge" class="px-4 py-1.5 rounded-full text-xs font-bold font-game uppercase tracking-wider bg-red-500/20 text-red-400 border border-red-500/30 flex items-center gap-2">
+                        <span class="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse"></span>
+                        Giliran: Pemain 1
+                    </div>
+
+                    <!-- Dice Display & Roll Button -->
+                    <div class="my-2 flex flex-col items-center gap-2">
+                        <div class="dice-box" id="dice-display">
+                            <i class="fa-solid fa-dice-one"></i>
+                        </div>
+                        <span id="dice-value-text" class="text-xs font-semibold text-slate-400">Klik tombol untuk lempar dadu</span>
+                    </div>
+
+                    <!-- Action Button -->
+                    <button id="roll-btn" onclick="rollDice()" class="w-full py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold font-game rounded-xl shadow-lg shadow-emerald-500/25 transition transform active:scale-95 text-base flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-dice"></i> LEMPAR DADU
+                    </button>
+                </div>
+
+                <!-- Board Cells (Generated dynamically or rendered via JS) -->
+            </div>
+        </div>
+
+        <!-- Right Column: Status & Control Panel (Cols 5) -->
+        <div class="lg:col-span-5 flex flex-col gap-4">
+
+            <!-- Player Status Cards -->
+            <div class="grid grid-cols-2 gap-3">
+                
+                <!-- Player 1 Card -->
+                <div id="card-p1" class="bg-slate-800/90 rounded-2xl p-3.5 border-2 border-red-500/80 relative shadow-lg transition-all">
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="flex items-center gap-2">
+                            <div class="w-7 h-7 rounded-full bg-red-600 text-white flex items-center justify-center font-bold text-xs shadow-md">P1</div>
+                            <span class="font-bold font-game text-sm text-red-400">Pemain 1</span>
+                        </div>
+                        <span class="text-[10px] px-2 py-0.5 rounded-md bg-red-950/60 text-red-300 font-mono" id="p1-assets-count">0 Toko</span>
+                    </div>
+                    <div class="text-xs text-slate-400">Uang Modal</div>
+                    <div class="text-lg font-bold font-mono text-emerald-400" id="p1-money">Rp 100.000</div>
+                    
+                    <!-- Asset badges -->
+                    <div class="mt-2 pt-2 border-t border-slate-700/60 flex flex-wrap gap-1" id="p1-properties-list">
+                        <span class="text-[10px] text-slate-500 italic">Belum ada aset</span>
+                    </div>
+                </div>
+
+                <!-- Player 2 Card -->
+                <div id="card-p2" class="bg-slate-800/90 rounded-2xl p-3.5 border-2 border-slate-700 relative shadow-lg transition-all opacity-70">
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="flex items-center gap-2">
+                            <div class="w-7 h-7 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs shadow-md">P2</div>
+                            <span class="font-bold font-game text-sm text-blue-400">Pemain 2</span>
+                        </div>
+                        <span class="text-[10px] px-2 py-0.5 rounded-md bg-blue-950/60 text-blue-300 font-mono" id="p2-assets-count">0 Toko</span>
+                    </div>
+                    <div class="text-xs text-slate-400">Uang Modal</div>
+                    <div class="text-lg font-bold font-mono text-emerald-400" id="p2-money">Rp 100.000</div>
+
+                    <!-- Asset badges -->
+                    <div class="mt-2 pt-2 border-t border-slate-700/60 flex flex-wrap gap-1" id="p2-properties-list">
+                        <span class="text-[10px] text-slate-500 italic">Belum ada aset</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Game Logs Feed -->
+            <div class="bg-slate-800/90 rounded-2xl p-4 border border-slate-700 shadow-xl flex flex-col h-48">
+                <div class="flex items-center justify-between mb-2 pb-2 border-b border-slate-700">
+                    <span class="font-bold font-game text-xs text-slate-300 flex items-center gap-2">
+                        <i class="fa-solid fa-list-check text-amber-400"></i> Catatan Perjalanan Game
+                    </span>
+                    <span class="text-[10px] text-slate-500" id="round-counter">Putaran 1</span>
+                </div>
+                <div id="log-box" class="flex-1 overflow-y-auto space-y-1.5 text-xs text-slate-300 pr-1">
+                    <div class="text-emerald-400 font-semibold">🎮 Game Dimulai! Pemain 1 mendapat giliran pertama.</div>
+                </div>
+            </div>
+
+            <!-- Rules Summary -->
+            <div class="bg-slate-800/50 rounded-2xl p-3.5 border border-slate-700/50 text-xs text-slate-400 space-y-1">
+                <div class="font-bold text-slate-200 font-game mb-1 flex items-center gap-1.5">
+                    <i class="fa-solid fa-lightbulb text-amber-400"></i> Cara Main Ringkas:
+                </div>
+                <p>• <strong>Beli Toko:</strong> Mendarat di toko kosong & jawab soal matematika dengan benar.</p>
+                <p>• <strong>Sewa Toko:</strong> Mendarat di toko lawan? Bayar sewa 20% dari harga toko.</p>
+                <p>• <strong>Kartu Soal:</strong> Benar = Bonus Rp 10.000, Salah = Denda Rp 5.000.</p>
+            </div>
+        </div>
+    </main>
+
+    <!-- MATH QUESTION MODAL -->
+    <div id="math-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md hidden justify-center items-center z-50 p-4">
+        <div class="bg-slate-900 border-2 border-indigo-500/50 rounded-3xl p-6 max-w-lg w-full shadow-2xl relative transform transition-all animate-bounce-in">
+            
+            <!-- Category Badge -->
+            <div class="flex items-center justify-between mb-4">
+                <span id="question-category" class="px-3 py-1 rounded-full bg-indigo-500/20 text-indigo-300 text-xs font-bold font-game border border-indigo-500/30">
+                    <i class="fa-solid fa-brain"></i> Aritmetika Sosial
+                </span>
+                <span class="text-xs text-amber-400 font-semibold flex items-center gap-1">
+                    <i class="fa-solid fa-coins"></i> Hadiah / Efek: <span id="question-reward">Toko Baru</span>
+                </span>
+            </div>
+
+            <!-- Question Text -->
+            <div class="bg-slate-800/80 rounded-2xl p-4 border border-slate-700 mb-4">
+                <p id="question-prompt" class="text-slate-100 text-sm md:text-base font-medium leading-relaxed">
+                    Beli buku seharga Rp 12.000, mendapat diskon 20%. Berapakah harga yang harus dibayar?
+                </p>
+            </div>
+
+            <!-- Input & Options -->
+            <form onsubmit="submitMathAnswer(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1">Jawaban Anda (Angka saja):</label>
+                    <div class="relative">
+                        <input type="number" step="any" id="math-answer-input" required placeholder="Ketik angka hasil hitungan..." 
+                               class="w-full bg-slate-950 border-2 border-slate-700 focus:border-indigo-500 rounded-xl px-4 py-3 text-white text-lg font-mono focus:outline-none transition">
+                    </div>
+                </div>
+
+                <div id="solution-hint" class="hidden bg-emerald-950/60 border border-emerald-500/30 rounded-xl p-3 text-xs text-emerald-300">
+                    <!-- Solution hints rendered here -->
+                </div>
+
+                <div class="flex gap-2 pt-2">
+                    <button type="button" onclick="toggleScratchpad()" class="px-4 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl border border-slate-700 transition">
+                        <i class="fa-solid fa-pen-to-square"></i> Coret-coret
+                    </button>
+                    <button type="submit" class="flex-1 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold font-game rounded-xl shadow-lg shadow-indigo-600/30 transition">
+                        Kirim Jawaban <i class="fa-solid fa-paper-plane ml-1"></i>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- SCRATCHPAD MODAL -->
+    <div id="scratchpad-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md hidden justify-center items-center z-50 p-4">
+        <div class="bg-slate-900 border border-slate-700 rounded-3xl p-4 max-w-lg w-full shadow-2xl flex flex-col">
+            <div class="flex items-center justify-between mb-3">
+                <h3 class="text-sm font-bold font-game text-amber-400 flex items-center gap-2">
+                    <i class="fa-solid fa-pen-nib"></i> Papan Coret-coret Hitung
+                </h3>
+                <div class="flex items-center gap-2">
+                    <button onclick="clearCanvas()" class="px-2.5 py-1 bg-rose-900/50 hover:bg-rose-900 text-rose-300 text-xs rounded-lg border border-rose-700/40">
+                        <i class="fa-solid fa-trash"></i> Hapus
+                    </button>
+                    <button onclick="toggleScratchpad()" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded-lg border border-slate-700">
+                        <i class="fa-solid fa-xmark"></i> Tutup
+                    </button>
+                </div>
+            </div>
+            <div class="bg-slate-950 rounded-2xl overflow-hidden border border-slate-800 touch-none">
+                <canvas id="scratch-canvas" width="500" height="350" class="w-full h-64 bg-slate-950"></canvas>
+            </div>
+            <p class="text-[10px] text-slate-500 mt-2 text-center">Gunakan mouse atau sentuhan jari di layar untuk menghitung buram.</p>
+        </div>
+    </div>
+
+    <!-- GAME RESULT MODAL -->
+    <div id="result-modal" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md hidden justify-center items-center z-50 p-4">
+        <div class="bg-slate-900 border-2 border-amber-500 rounded-3xl p-6 max-w-md w-full text-center shadow-2xl">
+            <div class="w-16 h-16 bg-amber-500/20 text-amber-400 rounded-full flex items-center justify-center text-3xl mx-auto mb-3">
+                <i class="fa-solid fa-trophy animate-bounce"></i>
+            </div>
+            <h2 class="text-2xl font-bold font-game text-white mb-1" id="winner-title">Pemain 1 Menang!</h2>
+            <p class="text-xs text-slate-400 mb-4" id="winner-reason">Lawan kehabisan modal uang (Bangkrut).</p>
+            
+            <div class="bg-slate-800 rounded-xl p-4 text-xs text-slate-300 space-y-2 mb-6">
+                <div class="flex justify-between border-b border-slate-700 pb-1">
+                    <span>Total Uang P1:</span> <span id="final-p1-money" class="font-mono font-bold text-emerald-400">Rp 0</span>
+                </div>
+                <div class="flex justify-between">
+                    <span>Total Uang P2:</span> <span id="final-p2-money" class="font-mono font-bold text-emerald-400">Rp 0</span>
+                </div>
+            </div>
+
+            <button onclick="resetGame()" class="w-full py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold font-game rounded-xl shadow-lg transition">
+                Main Lagi <i class="fa-solid fa-rotate-right ml-1"></i>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        /* ================= GAME DATA CONFIGURATION ================= */
+        // Board layout index map for 5x5 outer ring (16 cells)
+        // 0  1  2  3  4
+        // 15          5
+        // 14          6
+        // 13          7
+        // 12 11 10 9  8
+        const boardLayout = [
+            { id: 0, name: "START", type: "start", price: 0, icon: "fa-flag-checkered", color: "bg-emerald-500 text-white" },
+            { id: 1, name: "Toko Buku Alfa", type: "property", price: 10000, icon: "fa-book", color: "bg-rose-500 text-white", owner: null },
+            { id: 2, name: "Kartu Soal", type: "chance", price: 0, icon: "fa-graduation-cap", color: "bg-purple-500 text-white" },
+            { id: 3, name: "Kedai Bravo", type: "property", price: 15000, icon: "fa-mug-hot", color: "bg-rose-500 text-white", owner: null },
+            { id: 4, name: "Pajak Kebersihan", type: "tax", price: 10000, icon: "fa-broom", color: "bg-amber-600 text-white" },
+            { id: 5, name: "Rest Area", type: "rest", price: 0, icon: "fa-bed", color: "bg-blue-500 text-white" },
+            { id: 6, name: "Minimarket Charlie", type: "property", price: 20000, icon: "fa-store", color: "bg-cyan-500 text-white", owner: null },
+            { id: 7, name: "Kartu Soal", type: "chance", price: 0, icon: "fa-graduation-cap", color: "bg-purple-500 text-white" },
+            { id: 8, name: "Kantin Delta", type: "property", price: 25000, icon: "fa-utensils", color: "bg-cyan-500 text-white", owner: null },
+            { id: 9, name: "Bonus Beasiswa", type: "bonus", price: 15000, icon: "fa-award", color: "bg-emerald-600 text-white" },
+            { id: 10, name: "Toko Olahraga", type: "property", price: 30000, icon: "fa-football", color: "bg-amber-500 text-white", owner: null },
+            { id: 11, name: "Kartu Soal", type: "chance", price: 0, icon: "fa-graduation-cap", color: "bg-purple-500 text-white" },
+            { id: 12, name: "Bayar Listrik", type: "tax", price: 15000, icon: "fa-bolt", color: "bg-amber-600 text-white" },
+            { id: 13, name: "Koperasi Echo", type: "property", price: 35000, icon: "fa-bag-shopping", color: "bg-indigo-500 text-white", owner: null },
+            { id: 14, name: "Kartu Soal", type: "chance", price: 0, icon: "fa-graduation-cap", color: "bg-purple-500 text-white" },
+            { id: 15, name: "Toko Komputer", type: "property", price: 40000, icon: "fa-laptop", color: "bg-indigo-500 text-white", owner: null }
+        ];
+
+        // Grid positions mapping for 5x5 outer perimeter
+        const gridPositions = [
+            { r: 1, c: 1 }, { r: 1, c: 2 }, { r: 1, c: 3 }, { r: 1, c: 4 }, { r: 1, c: 5 },
+            { r: 2, c: 5 }, { r: 3, c: 5 }, { r: 4, c: 5 }, { r: 5, c: 5 },
+            { r: 5, c: 4 }, { r: 5, c: 3 }, { r: 5, c: 2 }, { r: 5, c: 1 },
+            { r: 4, c: 1 }, { r: 3, c: 1 }, { r: 2, c: 1 }
+        ];
+
+        // SMP Math Question Generator & Bank
+        const questionPool = [
+            // Aritmetika Sosial
+            { cat: "Aritmetika Sosial", q: "Beli tas seharga Rp 50.000 diskon 20%. Berapa rupiah harga yang harus dibayar?", a: 40000, hint: "Diskon = 20% × 50.000 = 10.000. Bayar = 50.000 - 10.000 = 40.000" },
+            { cat: "Aritmetika Sosial", q: "Beli 3 buku tulis seharga Rp 15.000. Berapa harga untuk 5 buku tulis yang sama?", a: 25000, hint: "1 buku = 15.000 / 3 = 5.000. Maka 5 buku = 5 × 5.000 = 25.000" },
+            { cat: "Aritmetika Sosial", q: "Membeli sepatu Rp 100.000 lalu dijual kembali mendapat keuntungan 15%. Berapa rupiah keuntungan tersebut?", a: 15000, hint: "Untung = 15% × 100.000 = 15.000" },
+            { cat: "Aritmetika Sosial", q: "Seorang pedagang membeli barang Rp 80.000 dan rugi Rp 8.000. Berapa rupiah harga jual barang tersebut?", a: 72000, hint: "Harga Jual = Harga Beli - Rugi = 80.000 - 8.000 = 72.000" },
+            { cat: "Aritmetika Sosial", q: "Tabungan di bank Rp 1.000.000 mendapat bunga 6% per tahun. Berapa rupiah bunga dalam 1 tahun?", a: 60000, hint: "Bunga = 6% × 1.000.000 = 60.000" },
+
+            // Aljabar Simpel
+            { cat: "Aljabar SMP", q: "Hitunglah nilai dari 3x + 8 jika nilai x = 5.", a: 23, hint: "Substitusi x = 5: 3(5) + 8 = 15 + 8 = 23" },
+            { cat: "Aljabar SMP", q: "Jika 2x - 4 = 10, berapakah nilai dari x?", a: 7, hint: "2x = 10 + 4 => 2x = 14 => x = 7" },
+            { cat: "Aljabar SMP", q: "Sederhanakan dan hitung nilai 5a + 2b - 3a jika a = 4 dan b = 3.", a: 14, hint: "5a - 3a + 2b = 2a + 2b = 2(4) + 2(3) = 8 + 6 = 14" },
+            { cat: "Aljabar SMP", q: "Jika 4y = 36, berapakah nilai dari y + 5?", a: 14, hint: "y = 36 / 4 = 9. Maka y + 5 = 9 + 5 = 14" },
+
+            // Bilangan Bulat & Pecahan
+            { cat: "Bilangan Bulat", q: "Hasil dari (-8) + 15 - (-5) adalah...", a: 12, hint: "-8 + 15 + 5 = 7 + 5 = 12" },
+            { cat: "Bilangan Bulat", q: "Suhu udara mula-mula -4°C, kemudian naik sebesar 12°C. Berapa suhu udara sekarang dalam °C?", a: 8, hint: "Suhu = -4 + 12 = 8" },
+            { cat: "Bilangan Bulat", q: "Hasil perkalian dari (-6) × 7 adalah...", a: -42, hint: "Negatif × Positif = Negatif (-42)" },
+            { cat: "Pecahan & Persen", q: "Berapakah nilai 75% dari 80?", a: 60, hint: "75/100 × 80 = 3/4 × 80 = 60" },
+            { cat: "Pecahan & Persen", q: "Hitunglah nilai dari (1/2 + 1/4) × 40.", a: 30, hint: "(2/4 + 1/4) = 3/4. Lalu 3/4 × 40 = 30" }
+        ];
+
+        /* ================= GAME STATE ================= */
+        let players = [
+            { id: 0, name: "Pemain 1", color: "p1", money: 100000, pos: 0, properties: [] },
+            { id: 1, name: "Pemain 2", color: "p2", money: 100000, pos: 0, properties: [] }
+        ];
+        let currentPlayerIndex = 0;
+        let isRolling = false;
+        let soundEnabled = true;
+        let currentMathCallback = null;
+        let currentQuestionObj = null;
+
+        // Audio Effects Generator (Web Audio API)
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playSound(type) {
+            if (!soundEnabled) return;
+            try {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                const now = audioCtx.currentTime;
+                if (type === 'roll') {
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(300, now);
+                    osc.frequency.exponentialRampToValueAtTime(600, now + 0.1);
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.linearRampToValueAtTime(0.01, now + 0.1);
+                    osc.start(now);
+                    osc.stop(now + 0.1);
+                } else if (type === 'correct') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(523.25, now); // C5
+                    osc.frequency.setValueAtTime(659.25, now + 0.1); // E5
+                    gain.gain.setValueAtTime(0.3, now);
+                    gain.gain.linearRampToValueAtTime(0.01, now + 0.3);
+                    osc.start(now);
+                    osc.stop(now + 0.3);
+                } else if (type === 'wrong') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(220, now);
+                    osc.frequency.setValueAtTime(160, now + 0.15);
+                    gain.gain.setValueAtTime(0.3, now);
+                    gain.gain.linearRampToValueAtTime(0.01, now + 0.3);
+                    osc.start(now);
+                    osc.stop(now + 0.3);
+                } else if (type === 'cash') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(880, now);
+                    osc.frequency.setValueAtTime(1760, now + 0.08);
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.linearRampToValueAtTime(0.01, now + 0.2);
+                    osc.start(now);
+                    osc.stop(now + 0.2);
+                }
+            } catch(e) {}
+        }
+
+        function toggleSound() {
+            soundEnabled = !soundEnabled;
+            document.getElementById('sound-status').innerText = soundEnabled ? 'Suara: ON' : 'Suara: OFF';
+        }
+
+        /* ================= RENDER BOARD & TOKENS ================= */
+        function initBoardUI() {
+            const boardGrid = document.getElementById('board-grid');
+            
+            // Remove previous cell elements except center play area
+            const oldCells = boardGrid.querySelectorAll('.board-cell');
+            oldCells.forEach(cell => cell.remove());
+
+            boardLayout.forEach((cell, idx) => {
+                const pos = gridPositions[idx];
+                const cellDiv = document.createElement('div');
+                cellDiv.className = `board-cell shadow-sm border border-slate-200`;
+                cellDiv.style.gridRowStart = pos.r;
+                cellDiv.style.gridColumnStart = pos.c;
+                cellDiv.id = `cell-${idx}`;
+
+                // Header bar
+                const headerDiv = document.createElement('div');
+                headerDiv.className = `cell-header ${cell.color}`;
+                headerDiv.innerText = cell.name.length > 12 ? cell.name.substring(0, 10) + '..' : cell.name;
+                cellDiv.appendChild(headerDiv);
+
+                // Body content
+                const bodyDiv = document.createElement('div');
+                bodyDiv.className = "flex-1 flex flex-col items-center justify-center my-1 text-slate-700";
+                bodyDiv.innerHTML = `<i class="fa-solid ${cell.icon} text-sm mb-0.5"></i>`;
+                if (cell.price > 0) {
+                    bodyDiv.innerHTML += `<span class="text-[9px] font-mono font-bold text-slate-600">Rp${(cell.price/1000)}rb</span>`;
+                }
+                cellDiv.appendChild(bodyDiv);
+
+                // Owner Tag & Token Container
+                const footerDiv = document.createElement('div');
+                footerDiv.className = "w-full flex items-center justify-between px-1 min-h-[18px]";
+                footerDiv.innerHTML = `
+                    <div id="owner-badge-${idx}" class="text-[8px] font-bold px-1 rounded text-white"></div>
+                    <div id="tokens-at-${idx}" class="flex gap-0.5 ml-auto"></div>
+                `;
+                cellDiv.appendChild(footerDiv);
+
+                boardGrid.appendChild(cellDiv);
+            });
+
+            updateTokensUI();
+            updateBoardOwnersUI();
+        }
+
+        function updateTokensUI() {
+            // Clear all token containers
+            for (let i = 0; i < 16; i++) {
+                const container = document.getElementById(`tokens-at-${i}`);
+                if (container) container.innerHTML = '';
+            }
+
+            // Render player tokens
+            players.forEach((p, idx) => {
+                const container = document.getElementById(`tokens-at-${p.pos}`);
+                if (container) {
+                    const token = document.createElement('div');
+                    token.className = `token ${p.color === 'p1' ? 'token-p1' : 'token-p2'}`;
+                    token.innerText = `P${idx + 1}`;
+                    container.appendChild(token);
+                }
+            });
+        }
+
+        function updateBoardOwnersUI() {
+            boardLayout.forEach((cell, idx) => {
+                const ownerBadge = document.getElementById(`owner-badge-${idx}`);
+                if (ownerBadge) {
+                    if (cell.owner !== null) {
+                        ownerBadge.className = `text-[8px] font-bold px-1 rounded text-white ${cell.owner === 0 ? 'bg-red-600' : 'bg-blue-600'}`;
+                        ownerBadge.innerText = `P${cell.owner + 1}`;
+                    } else {
+                        ownerBadge.innerText = '';
+                    }
+                }
+            });
+        }
+
+        /* ================= GAMEPLAY ENGINE ================= */
+        function rollDice() {
+            if (isRolling) return;
+            isRolling = true;
+
+            const rollBtn = document.getElementById('roll-btn');
+            const diceDisplay = document.getElementById('dice-display');
+            const diceValueText = document.getElementById('dice-value-text');
+
+            rollBtn.disabled = true;
+            diceDisplay.classList.add('dice-rolling');
+            playSound('roll');
+
+            const diceIcons = [
+                'fa-dice-one', 'fa-dice-two', 'fa-dice-three', 
+                'fa-dice-four', 'fa-dice-five', 'fa-dice-six'
+            ];
+
+            let count = 0;
+            const rollInterval = setInterval(() => {
+                const randomVal = Math.floor(Math.random() * 6);
+                diceDisplay.innerHTML = `<i class="fa-solid ${diceIcons[randomVal]}"></i>`;
+                count++;
+
+                if (count > 10) {
+                    clearInterval(rollInterval);
+                    const finalDice = Math.floor(Math.random() * 6) + 1;
+                    diceDisplay.innerHTML = `<i class="fa-solid ${diceIcons[finalDice - 1]}"></i>`;
+                    diceDisplay.classList.remove('dice-rolling');
+                    diceValueText.innerText = `Hasil Dadu: ${finalDice}`;
+
+                    movePlayer(finalDice);
+                }
+            }, 50);
+        }
+
+        function movePlayer(steps) {
+            const player = players[currentPlayerIndex];
+            let stepCount = 0;
+
+            const stepInterval = setInterval(() => {
+                player.pos = (player.pos + 1) % 16;
+                stepCount++;
+                playSound('roll');
+                updateTokensUI();
+
+                // Check passing START tile
+                if (player.pos === 0) {
+                    player.money += 20000;
+                    playSound('cash');
+                    logMsg(`💰 <b>${player.name}</b> melewati START & dapat bonus Rp 20.000!`);
+                    updateScoreboard();
+                }
+
+                if (stepCount >= steps) {
+                    clearInterval(stepInterval);
+                    highlightCell(player.pos);
+                    setTimeout(() => {
+                        handleTileAction(player, boardLayout[player.pos]);
+                    }, 400);
+                }
+            }, 250);
+        }
+
+        function highlightCell(cellIdx) {
+            boardLayout.forEach((_, idx) => {
+                const el = document.getElementById(`cell-${idx}`);
+                if (el) el.classList.remove('active-highlight');
+            });
+            const activeEl = document.getElementById(`cell-${cellIdx}`);
+            if (activeEl) activeEl.classList.add('active-highlight');
+        }
+
+        function handleTileAction(player, cell) {
+            logMsg(`📌 <b>${player.name}</b> mendarat di <b>${cell.name}</b>.`);
+
+            if (cell.type === 'start') {
+                logMsg(`🏁 Mendarat di START! Tambah uang modal.`);
+                finishTurn();
+            } 
+            else if (cell.type === 'bonus') {
+                player.money += cell.price;
+                playSound('cash');
+                logMsg(`🎉 <b>${player.name}</b> mendapat ${cell.name} sebesar Rp ${cell.price.toLocaleString('id-ID')}!`);
+                finishTurn();
+            } 
+            else if (cell.type === 'tax') {
+                player.money -= cell.price;
+                playSound('wrong');
+                logMsg(`💸 <b>${player.name}</b> membayar ${cell.name} sebesar Rp ${cell.price.toLocaleString('id-ID')}.`);
+                finishTurn();
+            } 
+            else if (cell.type === 'rest') {
+                logMsg(`☕ <b>${player.name}</b> sedang beristirahat sejenak.`);
+                finishTurn();
+            } 
+            else if (cell.type === 'chance') {
+                // Kartu Soal
+                askMathQuestion("Kartu Soal Matematika", "Bonus Rp 10.000 (Jika Benar) / Denda Rp 5.000 (Jika Salah)", (isCorrect) => {
+                    if (isCorrect) {
+                        player.money += 10000;
+                        playSound('cash');
+                        logMsg(`✨ JAWABAN BENAR! <b>${player.name}</b> mendapat bonus Rp 10.000.`);
+                    } else {
+                        player.money -= 5000;
+                        playSound('wrong');
+                        logMsg(`❌ JAWABAN SALAH! <b>${player.name}</b> kena denda Rp 5.000.`);
+                    }
+                    finishTurn();
+                });
+            } 
+            else if (cell.type === 'property') {
+                if (cell.owner === null) {
+                    // Opportunity to Buy Property
+                    if (player.money >= cell.price) {
+                        askMathQuestion(`Beli ${cell.name}`, `Jawab benar untuk membeli seharga Rp ${cell.price.toLocaleString('id-ID')}`, (isCorrect) => {
+                            if (isCorrect) {
+                                player.money -= cell.price;
+                                cell.owner = player.id;
+                                player.properties.push(cell.name);
+                                playSound('cash');
+                                logMsg(`🏬 JAWABAN BENAR! <b>${player.name}</b> resmi membeli <b>${cell.name}</b>!`);
+                                updateBoardOwnersUI();
+                            } else {
+                                playSound('wrong');
+                                logMsg(`❌ Jawaban salah. <b>${player.name}</b> gagal membeli ${cell.name}.`);
+                            }
+                            finishTurn();
+                        });
+                    } else {
+                        logMsg(`⚠️ Uang <b>${player.name}</b> tidak cukup untuk membeli ${cell.name}.`);
+                        finishTurn();
+                    }
+                } 
+                else if (cell.owner !== player.id) {
+                    // Pay Rent to opponent
+                    const rent = cell.price * 0.20; // 20% Rent
+                    const ownerPlayer = players[cell.owner];
+                    player.money -= rent;
+                    ownerPlayer.money += rent;
+                    playSound('wrong');
+                    logMsg(`🏠 <b>${player.name}</b> mendarat di properti milik <b>${ownerPlayer.name}</b>. Bayar sewa 20% (Rp ${rent.toLocaleString('id-ID')}).`);
+                    finishTurn();
+                } 
+                else {
+                    logMsg(`🏠 <b>${player.name}</b> mengunjungi properti miliknya sendiri.`);
+                    finishTurn();
+                }
+            }
+        }
+
+        function askMathQuestion(title, rewardText, callback) {
+            currentMathCallback = callback;
+            
+            // Pick random math question from pool
+            const qObj = questionPool[Math.floor(Math.random() * questionPool.length)];
+            currentQuestionObj = qObj;
+
+            document.getElementById('question-category').innerText = qObj.cat;
+            document.getElementById('question-reward').innerText = rewardText;
+            document.getElementById('question-prompt').innerText = qObj.q;
+            document.getElementById('math-answer-input').value = '';
+
+            // Hide previous hints
+            const hintBox = document.getElementById('solution-hint');
+            hintBox.classList.add('hidden');
+            hintBox.innerHTML = '';
+
+            document.getElementById('math-modal').classList.remove('hidden');
+            document.getElementById('math-modal').classList.add('flex');
+            document.getElementById('math-answer-input').focus();
+        }
+
+        function submitMathAnswer(e) {
+            e.preventDefault();
+            const inputVal = parseFloat(document.getElementById('math-answer-input').value);
+            const isCorrect = Math.abs(inputVal - currentQuestionObj.a) < 0.01;
+
+            const hintBox = document.getElementById('solution-hint');
+            hintBox.innerHTML = `<b>Pembahasan:</b> ${currentQuestionObj.hint}`;
+            hintBox.classList.remove('hidden');
+
+            if (isCorrect) {
+                playSound('correct');
+            } else {
+                playSound('wrong');
+            }
+
+            setTimeout(() => {
+                document.getElementById('math-modal').classList.add('hidden');
+                document.getElementById('math-modal').classList.remove('flex');
+
+                if (currentMathCallback) {
+                    currentMathCallback(isCorrect);
+                }
+            }, 1200);
+        }
+
+        function finishTurn() {
+            updateScoreboard();
+
+            // Check bankruptcy / Game Over
+            if (players[currentPlayerIndex].money < 0) {
+                const winnerIndex = currentPlayerIndex === 0 ? 1 : 0;
+                showGameOver(players[winnerIndex], `${players[currentPlayerIndex].name} telah kehabisan modal (Bangkrut).`);
+                return;
+            }
+
+            // Switch Player Turn
+            currentPlayerIndex = currentPlayerIndex === 0 ? 1 : 0;
+            updateTurnBadge();
+
+            isRolling = false;
+            document.getElementById('roll-btn').disabled = false;
+        }
+
+        function updateTurnBadge() {
+            const badge = document.getElementById('turn-badge');
+            const cardP1 = document.getElementById('card-p1');
+            const cardP2 = document.getElementById('card-p2');
+
+            if (currentPlayerIndex === 0) {
+                badge.className = "px-4 py-1.5 rounded-full text-xs font-bold font-game uppercase tracking-wider bg-red-500/20 text-red-400 border border-red-500/30 flex items-center gap-2";
+                badge.innerHTML = `<span class="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse"></span> Giliran: Pemain 1`;
+                cardP1.classList.remove('opacity-70', 'border-slate-700');
+                cardP1.classList.add('border-red-500/80');
+                cardP2.classList.add('opacity-70', 'border-slate-700');
+                cardP2.classList.remove('border-blue-500/80');
+            } else {
+                badge.className = "px-4 py-1.5 rounded-full text-xs font-bold font-game uppercase tracking-wider bg-blue-500/20 text-blue-400 border border-blue-500/30 flex items-center gap-2";
+                badge.innerHTML = `<span class="w-2.5 h-2.5 rounded-full bg-blue-500 animate-pulse"></span> Giliran: Pemain 2`;
+                cardP2.classList.remove('opacity-70', 'border-slate-700');
+                cardP2.classList.add('border-blue-500/80');
+                cardP1.classList.add('opacity-70', 'border-slate-700');
+                cardP1.classList.remove('border-red-500/80');
+            }
+        }
+
+        function updateScoreboard() {
+            document.getElementById('p1-money').innerText = `Rp ${players[0].money.toLocaleString('id-ID')}`;
+            document.getElementById('p2-money').innerText = `Rp ${players[1].money.toLocaleString('id-ID')}`;
+
+            document.getElementById('p1-assets-count').innerText = `${players[0].properties.length} Toko`;
+            document.getElementById('p2-assets-count').innerText = `${players[1].properties.length} Toko`;
+
+            // Render property pills
+            const renderProps = (pObj, containerId) => {
+                const el = document.getElementById(containerId);
+                if (pObj.properties.length === 0) {
+                    el.innerHTML = `<span class="text-[10px] text-slate-500 italic">Belum ada aset</span>`;
+                } else {
+                    el.innerHTML = pObj.properties.map(pName => 
+                        `<span class="text-[9px] px-1.5 py-0.5 rounded bg-slate-700 text-slate-200 border border-slate-600 font-semibold">${pName}</span>`
+                    ).join('');
+                }
+            };
+
+            renderProps(players[0], 'p1-properties-list');
+            renderProps(players[1], 'p2-properties-list');
+        }
+
+        function logMsg(text) {
+            const logBox = document.getElementById('log-box');
+            const item = document.createElement('div');
+            item.className = "leading-tight text-slate-300";
+            item.innerHTML = text;
+            logBox.prepend(item);
+        }
+
+        /* ================= SCRATCHPAD CANVAS ================= */
+        let canvas, ctx, isDrawing = false;
+
+        function initScratchpad() {
+            canvas = document.getElementById('scratch-canvas');
+            ctx = canvas.getContext('2d');
+            ctx.strokeStyle = '#f59e0b'; // Amber yellow chalk
+            ctx.lineWidth = 3;
+            ctx.lineCap = 'round';
+
+            const startDraw = (e) => {
+                isDrawing = true;
+                ctx.beginPath();
+                const pos = getCanvasPos(e);
+                ctx.moveTo(pos.x, pos.y);
+            };
+
+            const draw = (e) => {
+                if (!isDrawing) return;
+                const pos = getCanvasPos(e);
+                ctx.lineTo(pos.x, pos.y);
+                ctx.stroke();
+            };
+
+            const stopDraw = () => { isDrawing = false; };
+
+            canvas.addEventListener('mousedown', startDraw);
+            canvas.addEventListener('mousemove', draw);
+            canvas.addEventListener('mouseup', stopDraw);
+
+            canvas.addEventListener('touchstart', (e) => { startDraw(e.touches[0]); e.preventDefault(); });
+            canvas.addEventListener('touchmove', (e) => { draw(e.touches[0]); e.preventDefault(); });
+            canvas.addEventListener('touchend', stopDraw);
+        }
+
+        function getCanvasPos(evt) {
+            const rect = canvas.getBoundingClientRect();
+            return {
+                x: (evt.clientX - rect.left) * (canvas.width / rect.width),
+                y: (evt.clientY - rect.top) * (canvas.height / rect.height)
+            };
+        }
+
+        function toggleScratchpad() {
+            const modal = document.getElementById('scratchpad-modal');
+            if (modal.classList.contains('hidden')) {
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+            } else {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }
+        }
+
+        function clearCanvas() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+
+        /* ================= GAME OVER & RESET ================= */
+        function showGameOver(winner, reason) {
+            document.getElementById('winner-title').innerText = `🏆 ${winner.name} Menang!`;
+            document.getElementById('winner-reason').innerText = reason;
+            document.getElementById('final-p1-money').innerText = `Rp ${players[0].money.toLocaleString('id-ID')}`;
+            document.getElementById('final-p2-money').innerText = `Rp ${players[1].money.toLocaleString('id-ID')}`;
+
+            document.getElementById('result-modal').classList.remove('hidden');
+            document.getElementById('result-modal').classList.add('flex');
+        }
+
+        function resetGamePrompt() {
+            if (confirm("Apakah Anda yakin ingin mengulang permainan dari awal?")) {
+                resetGame();
+            }
+        }
+
+        function resetGame() {
+            players = [
+                { id: 0, name: "Pemain 1", color: "p1", money: 100000, pos: 0, properties: [] },
+                { id: 1, name: "Pemain 2", color: "p2", money: 100000, pos: 0, properties: [] }
+            ];
+            boardLayout.forEach(cell => { cell.owner = null; });
+            currentPlayerIndex = 0;
+            isRolling = false;
+
+            document.getElementById('result-modal').classList.add('hidden');
+            document.getElementById('log-box').innerHTML = '<div class="text-emerald-400 font-semibold">🎮 Game Dimulai! Pemain 1 mendapat giliran pertama.</div>';
+            document.getElementById('roll-btn').disabled = false;
+            document.getElementById('dice-value-text').innerText = 'Klik tombol untuk lempar dadu';
+
+            initBoardUI();
+            updateScoreboard();
+            updateTurnBadge();
+        }
+
+        // Initialize on Window Load
+        window.onload = () => {
+            initBoardUI();
+            initScratchpad();
+            updateTurnBadge();
+        };
+    </script>
+</body>
+</html>
